@@ -85,7 +85,6 @@ cat > /etc/systemd/system/adblocker-boot.service << 'EOF'
 Description=AdBlocker Auto-Start Service
 After=network.target
 Wants=network-online.target
-Before=dnsmasq.service
 
 [Service]
 Type=oneshot
@@ -117,26 +116,4 @@ echo ""
 echo "Set your device DNS to: $(hostname -I | awk '{print $1}')"
 echo "Test with: nslookup doubleclick.net"
 echo ""
-# Create and enable boot service
-echo "🔧 Creating auto-start service..."
-cat > /etc/systemd/system/adblocker-boot.service << 'EOF'
-[Unit]
-Description=AdBlocker Auto-Start Service
-After=network.target
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/local/bin/adblocker start
-ExecStop=/usr/local/bin/adblocker stop
-TimeoutStartSec=300
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Enable services
-systemctl daemon-reload
-systemctl enable adblocker-boot.service
 echo "🔌 Auto-start: ENABLED - Will start automatically on boot!"
