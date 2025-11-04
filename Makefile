@@ -7,7 +7,8 @@ VERSION = 2025.1
 
 install:
 	@echo "Installing AdBlocker v$(VERSION)..."
-	@chmod +x installer.sh blocker.sh updater.sh uninstaller.sh
+	@chmod +x src/*.sh
+	@cp src/*.sh .
 	@echo "✅ Ready! Now run: sudo ./installer.sh"
 
 uninstall:
@@ -18,7 +19,7 @@ uninstall:
 	fi
 
 clean:
-	@rm -f *.deb
+	@rm -f *.sh
 	@rm -rf build/
 
 package: clean
