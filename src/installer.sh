@@ -20,52 +20,66 @@ apt install -y dnsmasq curl
 echo "📁 Creating directory structure..."
 mkdir -p /opt/adblocker/blocklists
 mkdir -p /opt/adblocker/logs
-mkdir -p /etc/adblocker
+mkdir -p /etc/dnsmasq.d
 
-# Copy configuration
+# Create adblocker config
 echo "⚙️  Setting up configuration..."
-cp config/dnsmasq.conf /etc/dnsmasq.conf
-cp blocklists/sources.txt /opt/adblocker/
+cat > /etc/dnsmasq.d/adblocker.conf << 'EOF'
+# AdBlocker Configuration
+interface=eth0
+interface=wlan0
+
+# Basic settings
+domain-needed
+bogus-priv
+
+# Upstream DNS
+server=8.8.8.8
+server=1.1.1.1
+
+# Block IPv6
+filter-AAAA
+
+# Logging
+log-queries
+log-facility=/opt/adblocker/logs/dnsmasq.log
+
+# Blocklists
+addn-hosts=/opt/adblocker/blocklists/ads.hosts
+EOF
+
+# Create sources file
+cat > /opt/adblocker/sources.txt << 'EOF'
+https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+https://adaway.org/hosts.txt
+https://www.github.developerdan.com/hosts/lists/ads-and-tracking-extended.txt
+https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&mimetype=plaintext
+https://raw.githubusercontent.com/jerryn70/GoodbyeAds/master/Hosts/GoodbyeAds.txt
+EOF
+
+# Copy scripts to /opt/adblocker
+echo "📄 Installing scripts..."
+cp blocker.sh updater.sh uninstaller.sh /opt/adblocker/
+
+# Make scripts executable
+chmod +x /opt/adblocker/*.sh
+
+# Create symlinks for easy commands
+ln -sf /opt/adblocker/blocker.sh /usr/local/bin/adblocker
+ln -sf /opt/adblocker/updater.sh /usr/local/bin/adblocker-update
+ln -sf /opt/adblocker/uninstaller.sh /usr/local/bin/adblocker-uninstall
 
 # Download initial blocklists
 echo "📥 Downloading blocklists..."
 /opt/adblocker/updater.sh
 
-# Backup original resolv.conf
-cp /etc/resolv.conf /etc/resolv.conf.backup.adblocker
-
-# Create systemd service
-echo "🎯 Creating system service..."
-cat > /etc/systemd/system/adblocker.service << EOF
-[Unit]
-Description=AdBlocker DNS Service
-After=network.target
-
-[Service]
-Type=forking
-ExecStart=/opt/adblocker/blocker.sh start
-ExecStop=/opt/adblocker/blocker.sh stop
-Restart=always
-User=root
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Make scripts executable
-chmod +x /opt/adblocker/*.sh
-
-# Enable and start service
-systemctl daemon-reload
-systemctl enable adblocker
-systemctl start adblocker
-
 echo "✅ Installation complete!"
 echo ""
 echo "Quick Commands:"
 echo "  sudo adblocker start    - Start blocking"
-echo "  sudo adblocker stop     - Stop blocking" 
-echo "  sudo adblocker update   - Update blocklists"
+echo "  sudo adblocker stop     - Stop blocking"
 echo "  sudo adblocker status   - Check status"
+echo "  sudo adblocker-update   - Update blocklists"
 echo ""
 echo "Set your device DNS to: $(hostname -I | awk '{print $1}')"
+echo "Test with: nslookup doubleclick.net"
