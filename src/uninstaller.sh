@@ -18,12 +18,16 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 echo "🛑 Stopping services..."
+systemctl stop adblocker-boot.service 2>/dev/null || true
+systemctl disable adblocker-boot.service 2>/dev/null || true
 systemctl stop dnsmasq 2>/dev/null || true
 
 echo "📁 Removing configuration files..."
 rm -f /etc/dnsmasq.d/adblocker.conf
+rm -f /etc/systemd/system/adblocker-boot.service
 
 echo "🔧 Restoring dnsmasq..."
+systemctl daemon-reload
 systemctl restart dnsmasq
 
 echo "📄 Removing scripts and data..."
