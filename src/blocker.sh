@@ -25,9 +25,32 @@ show_help() {
 }
 
 check_installed() {
-    if [ ! -f "$CONFIG_FILE" ]; then
+    if [ ! -d "/opt/adblocker" ]; then
         echo "❌ AdBlocker not installed. Run installer first."
         exit 1
+    fi
+}
+
+ensure_config() {
+    # Ensure config directory exists
+    mkdir -p /etc/dnsmasq.d
+    
+    # Create config file if missing
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo "📄 Creating adblocker configuration..."
+        cat > "$CONFIG_FILE" << 'CONFIG_EOF'
+# AdBlocker Configuration
+interface=eth0
+interface=wlan0
+domain-needed
+bogus-priv
+server=8.8.8.8
+server=1.1.1.1
+filter-AAAA
+log-queries
+log-facility=/opt/adblocker/logs/dnsmasq.log
+addn-hosts=/opt/adblocker/blocklists/ads.hosts
+CONFIG_EOF
     fi
 }
 
@@ -35,18 +58,25 @@ case "$1" in
     start|enable)
         check_installed
         echo "🛡️  Starting AdBlocker..."
+        
+        # Ensure config exists
+        ensure_config
+        
         if [ ! -f "$BLOCKLIST_FILE" ]; then
             echo "📥 No blocklists found. Downloading..."
             adblocker-update
         fi
-        # Ensure config is in place
-        if [ ! -f "$CONFIG_FILE" ]; then
-            echo "❌ Config missing. Re-run installer."
-            exit 1
-        fi
+        
+        # Restart dnsmasq to apply config
         systemctl restart dnsmasq
+        
+        # Start and enable the boot service
+        systemctl enable adblocker-boot.service > /dev/null 2>&1 || true
+        systemctl start adblocker-boot.service > /dev/null 2>&1 || true
+        
         echo "✅ AdBlocker started"
         echo "📡 Set device DNS to: $(hostname -I | awk '{print $1}')"
+        echo "🔌 Auto-start: ENABLED"
         ;;
         
     stop|disable)
@@ -55,12 +85,16 @@ case "$1" in
             rm -f "$CONFIG_FILE"
         fi
         systemctl restart dnsmasq
+        systemctl stop adblocker-boot.service > /dev/null 2>&1 || true
+        systemctl disable adblocker-boot.service > /dev/null 2>&1 || true
         echo "✅ AdBlocker stopped"
+        echo "🔌 Auto-start: DISABLED"
         ;;
         
     restart)
         check_installed
         echo "🔄 Restarting AdBlocker..."
+        ensure_config
         systemctl restart dnsmasq
         echo "✅ AdBlocker restarted"
         ;;
@@ -80,8 +114,9 @@ case "$1" in
             echo "📊 Blocklists: Not downloaded"
         fi
         
-        echo -e "\n=== dnsmasq Service ==="
+        echo -e "\n=== Services ==="
         systemctl is-active dnsmasq > /dev/null && echo "🟢 dnsmasq: RUNNING" || echo "🔴 dnsmasq: STOPPED"
+        systemctl is-enabled adblocker-boot.service > /dev/null 2>&1 && echo "🟢 auto-start: ENABLED" || echo "🔴 auto-start: DISABLED"
         
         echo -e "\n=== Network Info ==="
         echo "📡 Pi IP Address: $(hostname -I | awk '{print $1}')"
@@ -105,7 +140,7 @@ case "$1" in
             COUNT=$(wc -l < "$BLOCKLIST_FILE")
             echo "📊 Blocking Statistics:"
             echo "   Total domains blocked: $COUNT"
-            echo "   Last updated: $(stat -c %y "$BLOCKLIST_FILE" 2>/dev/null | cut -d' ' -f1) || echo "Unknown")"
+            echo "   Last updated: $(stat -c %y "$BLOCKLIST_FILE" 2>/dev/null | cut -d' ' -f1 || echo "Unknown")"
         else
             echo "❌ No blocklists found. Run 'adblocker-update' first."
         fi
