@@ -55,6 +55,11 @@ https://adaway.org/hosts.txt
 https://www.github.developerdan.com/hosts/lists/ads-and-tracking-extended.txt
 https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&mimetype=plaintext
 https://raw.githubusercontent.com/jerryn70/GoodbyeAds/master/Hosts/GoodbyeAds.txt
+
+# YouTube Specific Blocklists
+https://raw.githubusercontent.com/kboghdady/youTube_ads_4_pi-hole/master/blacklist.txt
+https://raw.githubusercontent.com/Perflyst/PiHoleBlocklist/master/SmartTV-AGH.txt
+https://raw.githubusercontent.com/badmojr/1Hosts/master/mini/hosts.txt
 EOF
 
 # Copy scripts to /opt/adblocker
@@ -73,6 +78,34 @@ ln -sf /opt/adblocker/uninstaller.sh /usr/local/bin/adblocker-uninstall
 echo "📥 Downloading blocklists..."
 /opt/adblocker/updater.sh
 
+# Create and enable boot service
+echo "🔧 Creating auto-start service..."
+cat > /etc/systemd/system/adblocker-boot.service << 'EOF'
+[Unit]
+Description=AdBlocker Auto-Start Service
+After=network.target
+Wants=network-online.target
+Before=dnsmasq.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/adblocker start
+ExecStop=/usr/local/bin/adblocker stop
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable services
+systemctl daemon-reload
+systemctl enable adblocker-boot.service
+systemctl enable dnsmasq
+
+# Start services
+systemctl start adblocker-boot.service
+
 echo "✅ Installation complete!"
 echo ""
 echo "Quick Commands:"
@@ -83,3 +116,5 @@ echo "  sudo adblocker-update   - Update blocklists"
 echo ""
 echo "Set your device DNS to: $(hostname -I | awk '{print $1}')"
 echo "Test with: nslookup doubleclick.net"
+echo ""
+echo "🔌 Auto-start: ENABLED - Will start automatically on boot!"
